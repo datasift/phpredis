@@ -144,7 +144,7 @@ PHPAPI char *redis_sock_read_bulk_reply(RedisSock *redis_sock, int bytes TSRMLS_
     } else {
         char c;
         int i;
-        
+
 		reply = emalloc(bytes+1);
 
         while(offset < bytes) {
@@ -1218,6 +1218,8 @@ PHPAPI int redis_sock_read_multibulk_reply_assoc(INTERNAL_FUNCTION_PARAMETERS, R
  */
 PHPAPI int redis_sock_write(RedisSock *redis_sock, char *cmd, size_t sz TSRMLS_DC)
 {
+	size_t bytes_written = 0;
+
 	if(redis_sock && redis_sock->status == REDIS_SOCK_STATUS_DISCONNECTED) {
 		zend_throw_exception(redis_exception_ce, "Connection closed", 0 TSRMLS_CC);
 		return -1;
@@ -1225,7 +1227,14 @@ PHPAPI int redis_sock_write(RedisSock *redis_sock, char *cmd, size_t sz TSRMLS_D
     if(-1 == redis_check_eof(redis_sock TSRMLS_CC)) {
         return -1;
     }
-    return php_stream_write(redis_sock->stream, cmd, sz);
+
+    bytes_written = php_stream_write(redis_sock->stream, cmd, sz);
+
+    if (bytes_written != sz) {
+    	zend_throw_exception(redis_exception_ce, "Socket write failure", 0 TSRMLS_CC);
+    }
+
+    return bytes_written;
 }
 
 /**
@@ -1373,7 +1382,7 @@ PHPAPI int
 redis_key_prefix(RedisSock *redis_sock, char **key, int *key_len TSRMLS_DC) {
 	int ret_len;
 	char *ret;
-	
+
 	if(redis_sock->prefix == NULL || redis_sock->prefix_len == 0) {
 		return 0;
 	}
